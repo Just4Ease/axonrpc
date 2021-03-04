@@ -66,7 +66,7 @@ func (s *Server) register(sd *ServiceDesc, ss interface{}) {
 		serviceImpl: ss,
 		methods:     make(map[string]*MethodDesc),
 		//streams:     make(map[string]*StreamDesc),
-		//mdata:       sd.Metadata,
+		mdata:       sd.Metadata,
 	}
 	for i := range sd.Methods {
 		d := &sd.Methods[i]
@@ -91,15 +91,16 @@ type tendonisServerInterface interface {
 func (s *Server) Serve() error {
 	handlers := make([]axon.EventHandler, 0)
 	for serviceName, svc := range s.services {
-		for _, method := range svc.methods {
-			handlers = append(handlers, func() error {
-				endpoint := fmt.Sprintf("%s.%s", serviceName, method.MethodName)
-				log.Printf("axonRPC endpoint registration: %s", endpoint)
+		for methodName, method := range svc.methods {
+			m := method
+			endpoint := fmt.Sprintf("%s.%s", serviceName, methodName)
+			log.Printf("axonRPC endpoint registration: %s", endpoint)
+			fn := func() error {
 				return s.conn.Reply(endpoint, func(input []byte) ([]byte, error) {
-					return method.Handler(svc.serviceImpl, s.serveContext, input)
-					//reply, appErr := method.Handler(, s.serveContext, )
+					return m.Handler(svc.serviceImpl, s.serveContext, input)
 				})
-			})
+			}
+			handlers = append(handlers, fn)
 		}
 	}
 	s.serve = true
